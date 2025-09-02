@@ -1,196 +1,196 @@
 /**
  * WhatsApp Client Manager
- * Handles WhatsApp Web.js client initialization, QR code generation, and message sending
- * This module prevents circular dependencies by being a standalone client manager
+ * Singleton client using whatsapp-web.js with LocalAuth for session persistence
+ * Manages global states and provides WhatsApp messaging functionality
  */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
+const QRCode = require('qrcode');
+const path = require('path');
 
-// Global variables to store client state
-let client = null;
-let qrCodeData = null;
+// Global state management
+let whatsappClient = null;
 let isClientReady = false;
 let connectionStatus = 'disconnected';
+let qrCodeData = null;
 
 /**
- * Initialize WhatsApp client with proper event handlers
- * Sets up authentication and QR code generation
+ * Initialize WhatsApp client with LocalAuth for session persistence
+ * Sets up event handlers for authentication and connection status
  */
-function initializeWhatsAppClient() {
-  console.log('🚀 Initializing WhatsApp client...');
-
-  // Create new client instance with local authentication
-  client = new Client({
-    authStrategy: new LocalAuth({
-      dataPath: './whatsapp-session',
-      clientId: 'rafi-scheme-client'
-    }),
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu'
-      ]
-    }
-  });
-
-  // Event handler for QR code generation
-  client.on('qr', async (qr) => {
-    console.log('🔄 New QR Code received, generating base64...');
+const initializeWhatsAppClient = async () => {
     try {
-      // Convert QR code to base64 for frontend display
-      qrCodeData = await qrcode.toDataURL(qr);
-      console.log('✅ QR Code converted to base64 successfully');
-      connectionStatus = 'qr_ready';
+        console.log('🤖 Initializing WhatsApp client...');
+
+        // Create new client instance with LocalAuth
+        whatsappClient = new Client({
+            authStrategy: new LocalAuth({
+                clientId: process.env.CLIENT_ID || 'default-client',
+                dataPath: process.env.SESSION_PATH || './whatsapp-session'
+            }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ]
+            }
+        });
+
+        // Event handler: QR code generation
+        whatsappClient.on('qr', async (qr) => {
+            console.log('📱 QR Code received, generating DataURL...');
+            try {
+                // Generate QR code as DataURL
+                qrCodeData = await QRCode.toDataURL(qr);
+                connectionStatus = 'qr_ready';
+                console.log('✅ QR Code generated successfully');
+            } catch (error) {
+                console.error('❌ Error generating QR code:', error.message);
+                connectionStatus = 'qr_error';
+            }
+        });
+
+        // Event handler: Authentication successful
+        whatsappClient.on('authenticated', () => {
+            console.log('✅ WhatsApp client authenticated successfully');
+            connectionStatus = 'authenticated';
+            qrCodeData = null; // Clear QR code after authentication
+        });
+
+        // Event handler: Client ready
+        whatsappClient.on('ready', () => {
+            console.log('🚀 WhatsApp client is ready!');
+            isClientReady = true;
+            connectionStatus = 'ready';
+            qrCodeData = null; // Clear QR code when ready
+        });
+
+        // Event handler: Authentication failure
+        whatsappClient.on('auth_failure', (msg) => {
+            console.error('❌ WhatsApp authentication failed:', msg);
+            isClientReady = false;
+            connectionStatus = 'auth_failure';
+            qrCodeData = null;
+        });
+
+        // Event handler: Client disconnected
+        whatsappClient.on('disconnected', (reason) => {
+            console.log('🔌 WhatsApp client disconnected:', reason);
+            isClientReady = false;
+            connectionStatus = 'disconnected';
+            qrCodeData = null;
+        });
+
+        // Event handler: Loading screen
+        whatsappClient.on('loading_screen', (percent, message) => {
+            console.log(`📱 Loading: ${percent}% - ${message}`);
+            connectionStatus = 'loading';
+        });
+
+        // Initialize the client
+        await whatsappClient.initialize();
+        console.log('✅ WhatsApp client initialization completed');
+
     } catch (error) {
-      console.error('❌ Error converting QR to base64:', error);
-      qrCodeData = null;
+        console.error('❌ Error initializing WhatsApp client:', error.message);
+        connectionStatus = 'error';
+        throw error;
     }
-  });
-
-  // Event handler for successful authentication
-  client.on('authenticated', () => {
-    console.log('✅ WhatsApp client authenticated successfully');
-    connectionStatus = 'authenticated';
-  });
-
-  // Event handler for client ready state
-  client.on('ready', () => {
-    console.log('🎉 WhatsApp client is ready and connected!');
-    isClientReady = true;
-    connectionStatus = 'ready';
-    qrCodeData = null; // Clear QR code once connected
-  });
-
-  // Event handler for authentication failure
-  client.on('auth_failure', (message) => {
-    console.error('❌ Authentication failed:', message);
-    connectionStatus = 'auth_failed';
-    qrCodeData = null;
-  });
-
-  // Event handler for client disconnection
-  client.on('disconnected', (reason) => {
-    console.log('🔌 WhatsApp client disconnected:', reason);
-    isClientReady = false;
-    connectionStatus = 'disconnected';
-    qrCodeData = null;
-  });
-
-  // Initialize the client
-  client.initialize();
-}
+};
 
 /**
- * Get current WhatsApp connection state
- * Returns object with connection status and QR code if available
+ * Get current WhatsApp client state
+ * @returns {Object} Current state including readiness, connection status, and QR code
  */
-function getWhatsAppState() {
-  return {
-    isReady: isClientReady,
-    status: connectionStatus,
-    qrCode: qrCodeData,
-    hasQrCode: qrCodeData !== null
-  };
-}
-
-/**
- * Get QR code data for frontend display
- * Returns base64 encoded QR code or null if not available
- */
-function getQrCode() {
-  return qrCodeData;
-}
-
-/**
- * Send WhatsApp message to specified number
- * @param {string} number - Phone number with country code (e.g., "1234567890")
- * @param {string} message - Message text to send
- * @returns {Promise<Object>} - Result object with success status and details
- */
-async function sendWhatsAppMessage(number, message) {
-  // Check if client is ready before sending
-  if (!isClientReady || !client) {
+const getWhatsAppState = () => {
     return {
-      success: false,
-      error: 'WhatsApp client is not ready. Please scan QR code first.'
+        isReady: isClientReady,
+        connectionStatus: connectionStatus,
+        qrCode: qrCodeData,
+        timestamp: new Date().toISOString(),
+        clientId: process.env.CLIENT_ID || 'default-client'
     };
-  }
-
-  try {
-    // Format phone number for WhatsApp (add @c.us suffix)
-    const chatId = number.includes('@') ? number : `${number}@c.us`;
-
-    // Send the message
-    const sentMessage = await client.sendMessage(chatId, message);
-
-    console.log(`✅ Message sent successfully to ${number}`);
-    return {
-      success: true,
-      messageId: sentMessage.id._serialized,
-      timestamp: sentMessage.timestamp,
-      to: number
-    };
-  } catch (error) {
-    console.error(`❌ Error sending message to ${number}:`, error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
+};
 
 /**
- * Check if WhatsApp client is ready for operations
- * @returns {boolean} - True if client is ready, false otherwise
+ * Send WhatsApp message to a specific number
+ * @param {string} number - Phone number in international format (e.g., "1234567890@c.us")
+ * @param {string} message - Message content to send
+ * @returns {Promise<Object>} Result object with success status and message
  */
-function isWhatsAppReady() {
-  return isClientReady;
-}
+const sendWhatsAppMessage = async (number, message) => {
+    try {
+        // Validate client readiness
+        if (!isClientReady || !whatsappClient) {
+            throw new Error('WhatsApp client is not ready');
+        }
+
+        // Validate inputs
+        if (!number || !message) {
+            throw new Error('Phone number and message are required');
+        }
+
+        // Format phone number if needed (add @c.us suffix if not present)
+        const formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
+
+        console.log(`📤 Sending message to ${formattedNumber}: ${message}`);
+
+        // Send message using WhatsApp client
+        const result = await whatsappClient.sendMessage(formattedNumber, message);
+
+        console.log('✅ Message sent successfully');
+
+        return {
+            success: true,
+            messageId: result.id._serialized,
+            timestamp: result.timestamp,
+            to: formattedNumber,
+            message: 'Message sent successfully'
+        };
+
+    } catch (error) {
+        console.error('❌ Error sending WhatsApp message:', error.message);
+        return {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
+    }
+};
 
 /**
- * Get client connection status
- * @returns {string} - Current connection status
+ * Disconnect WhatsApp client
+ * @returns {Promise<void>}
  */
-function getConnectionStatus() {
-  return connectionStatus;
-}
+const disconnectWhatsAppClient = async () => {
+    try {
+        if (whatsappClient) {
+            await whatsappClient.destroy();
+            whatsappClient = null;
+            isClientReady = false;
+            connectionStatus = 'disconnected';
+            qrCodeData = null;
+            console.log('✅ WhatsApp client disconnected successfully');
+        }
+    } catch (error) {
+        console.error('❌ Error disconnecting WhatsApp client:', error.message);
+    }
+};
 
-/**
- * Restart WhatsApp client connection
- * Useful for reconnecting after disconnection
- */
-async function restartWhatsAppClient() {
-  console.log('🔄 Restarting WhatsApp client...');
-
-  if (client) {
-    await client.destroy();
-  }
-
-  // Reset state variables
-  client = null;
-  qrCodeData = null;
-  isClientReady = false;
-  connectionStatus = 'disconnected';
-
-  // Reinitialize client
-  initializeWhatsAppClient();
-}
-
-// Export all functions for use in other modules
+// Export functions and state
 module.exports = {
-  initializeWhatsAppClient,
-  getWhatsAppState,
-  getQrCode,
-  sendWhatsAppMessage,
-  isWhatsAppReady,
-  getConnectionStatus,
-  restartWhatsAppClient
+    initializeWhatsAppClient,
+    getWhatsAppState,
+    sendWhatsAppMessage,
+    disconnectWhatsAppClient,
+    // Export state for direct access if needed
+    isClientReady,
+    connectionStatus,
+    qrCodeData
 };
