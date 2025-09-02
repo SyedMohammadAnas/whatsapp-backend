@@ -1,0 +1,36 @@
+# WhatsApp Backend Docker Compose Configuration
+# Builds and runs the WhatsApp backend service with proper networking
+
+services:
+  whatsapp-backend:
+    build: .
+    container_name: whatsapp-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    volumes:
+      # Persist WhatsApp session data
+      - whatsapp-session:/app/whatsapp-session
+      # Mount logs directory for debugging
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Named volumes for data persistence
+volumes:
+  whatsapp-session:
+    driver: local
+
+# Custom network for service isolation
+networks:
+  whatsapp-network:
+    driver: bridge
