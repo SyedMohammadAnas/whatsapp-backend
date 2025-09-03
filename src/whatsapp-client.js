@@ -4,10 +4,11 @@
  * Manages global states and provides WhatsApp messaging functionality with improved session management
  */
 
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const SupabaseAuthStrategy = require('./supabase-auth-strategy');
 
 // Global state management
 let whatsappClient = null;
@@ -202,9 +203,9 @@ const initializeWhatsAppClient = async () => {
         // Reset reconnection attempts on fresh initialization
         reconnectAttempts = 0;
 
-        // Create new client instance with LocalAuth
+        // Create new client instance with custom authentication strategy
         whatsappClient = new Client({
-            authStrategy: new LocalAuth({
+            authStrategy: new SupabaseAuthStrategy({
                 clientId: process.env.CLIENT_ID || 'default-client',
                 dataPath: process.env.SESSION_PATH || './whatsapp-session'
             }),

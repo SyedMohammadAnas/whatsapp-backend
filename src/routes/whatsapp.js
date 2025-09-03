@@ -16,6 +16,12 @@ const {
     cleanupSessions
 } = require('../whatsapp-client');
 
+// Import Supabase session management functions
+const {
+    getAllActiveSessions,
+    cleanupOldSessions
+} = require('../supabase');
+
 /**
  * GET /api/whatsapp/status
  * Returns current WhatsApp client status including readiness and connection status
@@ -367,6 +373,126 @@ router.post('/cleanup-sessions', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Session cleanup failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * GET /api/whatsapp/sessions
+ * Returns all active sessions from Supabase (production only)
+ */
+router.get('/sessions', async (req, res) => {
+    try {
+        console.log('📋 Sessions list request received');
+
+        // Only allow in production environment
+        if (process.env.NODE_ENV !== 'production') {
+            const response = {
+                success: false,
+                error: 'Not available in development',
+                message: 'Sessions endpoint is only available in production',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('❌ Sessions response sent: Not available in development');
+            return res.status(403).json(response);
+        }
+
+        const result = await getAllActiveSessions();
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    sessions: result.data,
+                    count: result.data.length,
+                    timestamp: new Date().toISOString()
+                },
+                message: `Retrieved ${result.data.length} active sessions`
+            };
+
+            console.log('✅ Sessions response sent:', response.message);
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: result.error,
+                message: 'Failed to retrieve sessions',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('❌ Sessions response sent: Failed to retrieve sessions');
+            res.status(500).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error getting sessions:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get sessions',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/cleanup-old-sessions
+ * Cleans up old inactive sessions from Supabase (production only)
+ */
+router.post('/cleanup-old-sessions', async (req, res) => {
+    try {
+        console.log('🧹 Old sessions cleanup request received');
+
+        // Only allow in production environment
+        if (process.env.NODE_ENV !== 'production') {
+            const response = {
+                success: false,
+                error: 'Not available in development',
+                message: 'Cleanup endpoint is only available in production',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('❌ Cleanup response sent: Not available in development');
+            return res.status(403).json(response);
+        }
+
+        const { daysOld = 30 } = req.body;
+
+        const result = await cleanupOldSessions(daysOld);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    deletedCount: result.deletedCount,
+                    daysOld: daysOld,
+                    timestamp: new Date().toISOString()
+                },
+                message: `Cleaned up ${result.deletedCount} old sessions`
+            };
+
+            console.log('✅ Cleanup response sent:', response.message);
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: result.error,
+                message: 'Failed to cleanup old sessions',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('❌ Cleanup response sent: Failed to cleanup old sessions');
+            res.status(500).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error cleaning up old sessions:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to cleanup old sessions',
             message: error.message,
             timestamp: new Date().toISOString()
         });
