@@ -1,14 +1,13 @@
 /**
  * WhatsApp Client Manager
- * Enhanced singleton client using whatsapp-web.js with LocalAuth for session persistence
- * Manages global states and provides WhatsApp messaging functionality with improved session management
+ * Simplified client using whatsapp-web.js with LocalAuth for local session persistence only
+ * Manages global states and provides WhatsApp messaging functionality
  */
 
-const { Client } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
-const SupabaseAuthStrategy = require('./supabase-auth-strategy');
 
 // Global state management
 let whatsappClient = null;
@@ -185,8 +184,8 @@ const stopSessionHealthChecks = () => {
 };
 
 /**
- * Initialize WhatsApp client with LocalAuth for session persistence
- * Sets up event handlers for authentication and connection status with enhanced error handling
+ * Initialize WhatsApp client with LocalAuth for local session persistence only
+ * Sets up event handlers for authentication and connection status
  */
 const initializeWhatsAppClient = async () => {
     try {
@@ -203,9 +202,9 @@ const initializeWhatsAppClient = async () => {
         // Reset reconnection attempts on fresh initialization
         reconnectAttempts = 0;
 
-        // Create new client instance with custom authentication strategy
+        // Create new client instance with LocalAuth only
         whatsappClient = new Client({
-            authStrategy: new SupabaseAuthStrategy({
+            authStrategy: new LocalAuth({
                 clientId: process.env.CLIENT_ID || 'default-client',
                 dataPath: process.env.SESSION_PATH || './whatsapp-session'
             }),
@@ -324,7 +323,7 @@ const initializeWhatsAppClient = async () => {
 };
 
 /**
- * Get current WhatsApp client state with enhanced session information
+ * Get current WhatsApp client state
  * @returns {Object} Current state including readiness, connection status, QR code, and session details
  */
 const getWhatsAppState = () => {
@@ -334,7 +333,7 @@ const getWhatsAppState = () => {
         qrCode: qrCodeData,
         timestamp: new Date().toISOString(),
         clientId: process.env.CLIENT_ID || 'default-client',
-        // Enhanced session information
+        // Session information
         sessionInfo: {
             reconnectAttempts: reconnectAttempts,
             maxReconnectAttempts: maxReconnectAttempts,

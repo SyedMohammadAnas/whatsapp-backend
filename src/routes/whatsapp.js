@@ -16,12 +16,6 @@ const {
     cleanupSessions
 } = require('../whatsapp-client');
 
-// Import Supabase session management functions
-const {
-    getAllActiveSessions,
-    cleanupOldSessions
-} = require('../supabase');
-
 /**
  * GET /api/whatsapp/status
  * Returns current WhatsApp client status including readiness and connection status
@@ -102,19 +96,19 @@ router.get('/qr', async (req, res) => {
             return res.status(200).json(response);
         }
 
-        // No QR code available
+        // QR code not available
         const response = {
             success: false,
-            error: 'QR code not available',
             data: {
+                qrCode: null,
                 connectionStatus: state.connectionStatus,
                 timestamp: state.timestamp
             },
-            message: `QR code not available. Current status: ${state.connectionStatus}`
+            message: 'QR code not available. Please wait for WhatsApp client to initialize.'
         };
 
-        console.log('❌ QR response sent: QR code not available');
-        res.status(404).json(response);
+        console.log('⚠️ QR response sent: QR code not available');
+        res.status(503).json(response);
 
     } catch (error) {
         console.error('❌ Error getting QR code:', error.message);
@@ -129,17 +123,15 @@ router.get('/qr', async (req, res) => {
 
 /**
  * POST /api/whatsapp/send
- * Sends WhatsApp message to specified number
- * Body: { number: string, message: string }
+ * Sends a WhatsApp message to a specified phone number
  */
 router.post('/send', async (req, res) => {
     try {
         console.log('📤 Send message request received');
 
-        // Extract and validate request body
         const { number, message } = req.body;
 
-        // Input validation
+        // Validate input
         if (!number || !message) {
             const errorResponse = {
                 success: false,
@@ -152,39 +144,8 @@ router.post('/send', async (req, res) => {
             return res.status(400).json(errorResponse);
         }
 
-        // Validate phone number format (basic validation)
-        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-        const cleanNumber = number.replace(/[^\d+]/g, '');
-
-        if (!phoneRegex.test(cleanNumber)) {
-            const errorResponse = {
-                success: false,
-                error: 'Invalid phone number format',
-                message: 'Please provide a valid phone number in international format',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Send response sent: Invalid phone number');
-            return res.status(400).json(errorResponse);
-        }
-
-        // Validate message length
-        if (message.length > 4096) {
-            const errorResponse = {
-                success: false,
-                error: 'Message too long',
-                message: 'Message must be 4096 characters or less',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Send response sent: Message too long');
-            return res.status(400).json(errorResponse);
-        }
-
-        console.log(`📤 Attempting to send message to ${cleanNumber}`);
-
-        // Send message using WhatsApp client
-        const result = await sendWhatsAppMessage(cleanNumber, message);
+        // Send message
+        const result = await sendWhatsAppMessage(number, message);
 
         if (result.success) {
             const response = {
@@ -198,18 +159,18 @@ router.post('/send', async (req, res) => {
                 message: 'Message sent successfully'
             };
 
-            console.log('✅ Send response sent: Message sent successfully');
+            console.log('✅ Send response sent: Message sent');
             res.status(200).json(response);
         } else {
             const errorResponse = {
                 success: false,
-                error: result.error,
-                message: 'Failed to send message',
+                error: 'Failed to send message',
+                message: result.error,
                 timestamp: result.timestamp
             };
 
-            console.log('❌ Send response sent: Failed to send message');
-            res.status(500).json(errorResponse);
+            console.log('❌ Send response sent: Send failed');
+            res.status(503).json(errorResponse);
         }
 
     } catch (error) {
@@ -225,35 +186,39 @@ router.post('/send', async (req, res) => {
 
 /**
  * GET /api/whatsapp/health
- * Health check endpoint for WhatsApp service
+ * Returns detailed health information about the WhatsApp client
  */
 router.get('/health', async (req, res) => {
     try {
         console.log('🏥 WhatsApp health check requested');
 
+        // Get current WhatsApp state
         const state = getWhatsAppState();
 
-        const response = {
+        // Prepare health response
+        const healthData = {
             success: true,
             data: {
-                service: 'WhatsApp API',
-                status: 'operational',
-                connectionStatus: state.connectionStatus,
                 isReady: state.isReady,
-                timestamp: new Date().toISOString(),
-                uptime: process.uptime()
+                connectionStatus: state.connectionStatus,
+                timestamp: state.timestamp,
+                clientId: state.clientId,
+                sessionInfo: state.sessionInfo
             },
-            message: 'WhatsApp service is operational'
+            message: `WhatsApp client health: ${state.connectionStatus}`
         };
 
-        console.log('✅ Health check response sent');
-        res.status(200).json(response);
+        // Set appropriate status code based on health
+        const statusCode = state.isReady ? 200 : 503;
+
+        console.log('✅ Health response sent:', healthData.message);
+        res.status(statusCode).json(healthData);
 
     } catch (error) {
-        console.error('❌ Error in health check:', error.message);
+        console.error('❌ Error getting health status:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Health check failed',
+            error: 'Failed to get health status',
             message: error.message,
             timestamp: new Date().toISOString()
         });
@@ -266,15 +231,16 @@ router.get('/health', async (req, res) => {
  */
 router.get('/session-info', async (req, res) => {
     try {
-        console.log('📊 Session info request received');
+        console.log('📋 Session info request received');
 
+        // Get detailed session information
         const sessionInfo = await getSessionInfo();
 
         if (sessionInfo.success) {
             console.log('✅ Session info response sent');
             res.status(200).json(sessionInfo);
         } else {
-            console.log('❌ Session info response sent: Failed to get session info');
+            console.log('❌ Session info response sent: Error');
             res.status(500).json(sessionInfo);
         }
 
@@ -291,12 +257,13 @@ router.get('/session-info', async (req, res) => {
 
 /**
  * POST /api/whatsapp/reconnect
- * Forces manual reconnection of WhatsApp client
+ * Forces manual reconnection of the WhatsApp client
  */
 router.post('/reconnect', async (req, res) => {
     try {
         console.log('🔄 Manual reconnection request received');
 
+        // Force reconnection
         const result = await forceReconnection();
 
         if (result.success) {
@@ -309,25 +276,25 @@ router.post('/reconnect', async (req, res) => {
                 message: 'Reconnection initiated successfully'
             };
 
-            console.log('✅ Reconnection response sent: Reconnection initiated');
+            console.log('✅ Reconnect response sent: Reconnection initiated');
             res.status(200).json(response);
         } else {
             const errorResponse = {
                 success: false,
-                error: result.error,
-                message: 'Failed to initiate reconnection',
+                error: 'Reconnection failed',
+                message: result.error,
                 timestamp: result.timestamp
             };
 
-            console.log('❌ Reconnection response sent: Failed to reconnect');
-            res.status(500).json(errorResponse);
+            console.log('❌ Reconnect response sent: Reconnection failed');
+            res.status(503).json(errorResponse);
         }
 
     } catch (error) {
         console.error('❌ Error during reconnection:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Reconnection failed',
+            error: 'Internal server error',
             message: error.message,
             timestamp: new Date().toISOString()
         });
@@ -336,12 +303,13 @@ router.post('/reconnect', async (req, res) => {
 
 /**
  * POST /api/whatsapp/cleanup-sessions
- * Manually cleans up corrupted and old session files
+ * Manually triggers session cleanup
  */
 router.post('/cleanup-sessions', async (req, res) => {
     try {
-        console.log('🧹 Session cleanup request received');
+        console.log('🧹 Manual session cleanup request received');
 
+        // Clean up sessions
         const result = await cleanupSessions();
 
         if (result.success) {
@@ -359,140 +327,20 @@ router.post('/cleanup-sessions', async (req, res) => {
         } else {
             const errorResponse = {
                 success: false,
-                error: result.error,
-                message: 'Failed to cleanup sessions',
+                error: 'Cleanup failed',
+                message: result.error,
                 timestamp: result.timestamp
             };
 
             console.log('❌ Cleanup response sent: Cleanup failed');
-            res.status(500).json(errorResponse);
+            res.status(503).json(errorResponse);
         }
 
     } catch (error) {
         console.error('❌ Error during session cleanup:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Session cleanup failed',
-            message: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-/**
- * GET /api/whatsapp/sessions
- * Returns all active sessions from Supabase (production only)
- */
-router.get('/sessions', async (req, res) => {
-    try {
-        console.log('📋 Sessions list request received');
-
-        // Only allow in production environment
-        if (process.env.NODE_ENV !== 'production') {
-            const response = {
-                success: false,
-                error: 'Not available in development',
-                message: 'Sessions endpoint is only available in production',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Sessions response sent: Not available in development');
-            return res.status(403).json(response);
-        }
-
-        const result = await getAllActiveSessions();
-
-        if (result.success) {
-            const response = {
-                success: true,
-                data: {
-                    sessions: result.data,
-                    count: result.data.length,
-                    timestamp: new Date().toISOString()
-                },
-                message: `Retrieved ${result.data.length} active sessions`
-            };
-
-            console.log('✅ Sessions response sent:', response.message);
-            res.status(200).json(response);
-        } else {
-            const errorResponse = {
-                success: false,
-                error: result.error,
-                message: 'Failed to retrieve sessions',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Sessions response sent: Failed to retrieve sessions');
-            res.status(500).json(errorResponse);
-        }
-
-    } catch (error) {
-        console.error('❌ Error getting sessions:', error.message);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to get sessions',
-            message: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-/**
- * POST /api/whatsapp/cleanup-old-sessions
- * Cleans up old inactive sessions from Supabase (production only)
- */
-router.post('/cleanup-old-sessions', async (req, res) => {
-    try {
-        console.log('🧹 Old sessions cleanup request received');
-
-        // Only allow in production environment
-        if (process.env.NODE_ENV !== 'production') {
-            const response = {
-                success: false,
-                error: 'Not available in development',
-                message: 'Cleanup endpoint is only available in production',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Cleanup response sent: Not available in development');
-            return res.status(403).json(response);
-        }
-
-        const { daysOld = 30 } = req.body;
-
-        const result = await cleanupOldSessions(daysOld);
-
-        if (result.success) {
-            const response = {
-                success: true,
-                data: {
-                    deletedCount: result.deletedCount,
-                    daysOld: daysOld,
-                    timestamp: new Date().toISOString()
-                },
-                message: `Cleaned up ${result.deletedCount} old sessions`
-            };
-
-            console.log('✅ Cleanup response sent:', response.message);
-            res.status(200).json(response);
-        } else {
-            const errorResponse = {
-                success: false,
-                error: result.error,
-                message: 'Failed to cleanup old sessions',
-                timestamp: new Date().toISOString()
-            };
-
-            console.log('❌ Cleanup response sent: Failed to cleanup old sessions');
-            res.status(500).json(errorResponse);
-        }
-
-    } catch (error) {
-        console.error('❌ Error cleaning up old sessions:', error.message);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to cleanup old sessions',
+            error: 'Internal server error',
             message: error.message,
             timestamp: new Date().toISOString()
         });
