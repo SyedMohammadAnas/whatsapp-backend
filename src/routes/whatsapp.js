@@ -10,7 +10,10 @@ const router = express.Router();
 // Import WhatsApp client functions
 const {
     getWhatsAppState,
-    sendWhatsAppMessage
+    sendWhatsAppMessage,
+    forceReconnection,
+    getSessionInfo,
+    cleanupSessions
 } = require('../whatsapp-client');
 
 /**
@@ -245,6 +248,125 @@ router.get('/health', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Health check failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * GET /api/whatsapp/session-info
+ * Returns detailed session information including files and directory status
+ */
+router.get('/session-info', async (req, res) => {
+    try {
+        console.log('📊 Session info request received');
+
+        const sessionInfo = await getSessionInfo();
+
+        if (sessionInfo.success) {
+            console.log('✅ Session info response sent');
+            res.status(200).json(sessionInfo);
+        } else {
+            console.log('❌ Session info response sent: Failed to get session info');
+            res.status(500).json(sessionInfo);
+        }
+
+    } catch (error) {
+        console.error('❌ Error getting session info:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get session info',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/reconnect
+ * Forces manual reconnection of WhatsApp client
+ */
+router.post('/reconnect', async (req, res) => {
+    try {
+        console.log('🔄 Manual reconnection request received');
+
+        const result = await forceReconnection();
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    message: result.message,
+                    timestamp: result.timestamp
+                },
+                message: 'Reconnection initiated successfully'
+            };
+
+            console.log('✅ Reconnection response sent: Reconnection initiated');
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: result.error,
+                message: 'Failed to initiate reconnection',
+                timestamp: result.timestamp
+            };
+
+            console.log('❌ Reconnection response sent: Failed to reconnect');
+            res.status(500).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error during reconnection:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Reconnection failed',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/cleanup-sessions
+ * Manually cleans up corrupted and old session files
+ */
+router.post('/cleanup-sessions', async (req, res) => {
+    try {
+        console.log('🧹 Session cleanup request received');
+
+        const result = await cleanupSessions();
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    message: result.message,
+                    timestamp: result.timestamp
+                },
+                message: 'Session cleanup completed successfully'
+            };
+
+            console.log('✅ Cleanup response sent: Cleanup completed');
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: result.error,
+                message: 'Failed to cleanup sessions',
+                timestamp: result.timestamp
+            };
+
+            console.log('❌ Cleanup response sent: Cleanup failed');
+            res.status(500).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error during session cleanup:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Session cleanup failed',
             message: error.message,
             timestamp: new Date().toISOString()
         });

@@ -1,56 +1,65 @@
 # WhatsApp Backend API
 
-A robust Node.js backend service for WhatsApp messaging using whatsapp-web.js with Express and session persistence.
+A robust WhatsApp backend service built with Node.js, Express, and whatsapp-web.js with enhanced session management capabilities.
 
-## 🚀 Features
+## Features
 
-- **WhatsApp Integration**: Connect to WhatsApp Web using whatsapp-web.js
-- **Session Persistence**: LocalAuth strategy for maintaining sessions
-- **RESTful API**: Express-based API with consistent JSON responses
-- **QR Code Generation**: Automatic QR code generation for authentication
-- **Message Sending**: Send WhatsApp messages via API endpoints
-- **Health Monitoring**: Built-in health check endpoints
-- **Error Handling**: Comprehensive error handling and logging
-- **CORS Support**: Cross-origin resource sharing enabled
-- **Development Tools**: Hot reload with nodemon
+### Core WhatsApp Functionality
+- **Message Sending**: Send WhatsApp messages to any phone number
+- **QR Code Authentication**: Secure QR code-based authentication
+- **Session Persistence**: Automatic session storage and recovery
+- **Real-time Status**: Monitor connection and authentication status
 
-## 📋 Prerequisites
+### Enhanced Session Management
+- **Automatic Reconnection**: Intelligent reconnection on disconnection
+- **Session Health Monitoring**: Periodic health checks every minute
+- **Session Validation**: Directory and file integrity validation
+- **Corrupted Session Cleanup**: Automatic cleanup of old/corrupted sessions
+- **Manual Session Control**: API endpoints for manual session management
+- **Detailed Session Information**: Comprehensive session diagnostics
 
-- Node.js (v14 or higher)
-- npm or yarn
-- WhatsApp mobile app for QR code scanning
+## Session Management Features
 
-## 🛠️ Installation
+### Automatic Features
+- **Session Directory Validation**: Creates and validates session directory on startup
+- **Corrupted Session Cleanup**: Removes session files older than 7 days
+- **Health Checks**: Monitors session health every 60 seconds
+- **Automatic Reconnection**: Attempts reconnection up to 5 times with exponential backoff
+- **Session Recovery**: Recovers from authentication failures and disconnections
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd whatsapp-backend
-   ```
+### Manual Control Endpoints
+- **Session Information**: Get detailed session diagnostics
+- **Manual Reconnection**: Force client reconnection
+- **Session Cleanup**: Manually trigger session cleanup
 
-2. **Install dependencies**
+## API Endpoints
+
+### Core Endpoints
+- `GET /health` - Server health check
+- `GET /api/whatsapp/status` - WhatsApp client status
+- `GET /api/whatsapp/qr` - Get QR code for authentication
+- `POST /api/whatsapp/send` - Send WhatsApp message
+- `GET /api/whatsapp/health` - WhatsApp service health check
+
+### Session Management Endpoints
+- `GET /api/whatsapp/session-info` - Detailed session information
+- `POST /api/whatsapp/reconnect` - Force manual reconnection
+- `POST /api/whatsapp/cleanup-sessions` - Manual session cleanup
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies:
    ```bash
    npm install
    ```
-
-3. **Configure environment variables**
+3. Create `.env` file with required configuration
+4. Start the server:
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **Start the server**
-   ```bash
-   # Development mode (with hot reload)
-   npm run dev
-
-   # Production mode
    npm start
    ```
 
-## ⚙️ Configuration
-
-### Environment Variables (.env)
+## Environment Variables
 
 ```env
 # Server Configuration
@@ -58,183 +67,52 @@ PORT=3001
 NODE_ENV=development
 
 # WhatsApp Configuration
-CLIENT_ID=your-app-client-id
+CLIENT_ID=rafi-scheme-manager
 SESSION_PATH=./whatsapp-session
 
 # Additional Configuration
 LOG_LEVEL=info
 ```
 
-### Configuration Options
+## Session Management Details
 
-- `PORT`: Server port (default: 3001)
-- `NODE_ENV`: Environment mode (development/production)
-- `CLIENT_ID`: Unique identifier for WhatsApp client
-- `SESSION_PATH`: Directory for storing WhatsApp sessions
-- `LOG_LEVEL`: Logging level (info, debug, error)
-
-## 📡 API Endpoints
-
-### Base URL
+### Session Directory Structure
 ```
-http://localhost:3001
+whatsapp-session/
+├── .wwebjs_auth/
+│   ├── session-rafi-scheme-manager/
+│   │   ├── session.json
+│   │   └── tokens.json
+└── .wwebjs_cache/
+    └── session-rafi-scheme-manager/
 ```
 
-### Health Check
-```http
-GET /health
-```
+### Session States
+- `disconnected` - Client is not connected
+- `qr_ready` - QR code available for scanning
+- `authenticated` - Authentication successful
+- `ready` - Client ready to send messages
+- `loading` - Client is loading
+- `reconnecting` - Attempting to reconnect
+- `auth_failure` - Authentication failed
+- `error` - Error occurred
+- `max_reconnect_exceeded` - Max reconnection attempts reached
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "service": "WhatsApp Backend API",
-    "status": "operational",
-    "environment": "development",
-    "timestamp": "2024-01-01T00:00:00.000Z",
-    "uptime": 123.45,
-    "version": "1.0.0",
-    "port": 3001
-  },
-  "message": "Server is running and healthy"
-}
-```
+### Reconnection Logic
+- **Max Attempts**: 5 reconnection attempts
+- **Initial Delay**: 5 seconds after disconnection
+- **Retry Delay**: 30 seconds between attempts
+- **Reset Conditions**: Successful authentication or manual reset
 
-### WhatsApp Status
-```http
-GET /api/whatsapp/status
-```
+### Health Check Features
+- **Frequency**: Every 60 seconds
+- **Validation**: Checks client state and connection
+- **Auto Recovery**: Triggers reconnection on health failure
+- **Manual Override**: Can be controlled via API endpoints
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "isReady": true,
-    "connectionStatus": "ready",
-    "timestamp": "2024-01-01T00:00:00.000Z",
-    "clientId": "default-client"
-  },
-  "message": "WhatsApp client is ready"
-}
-```
+## Usage Examples
 
-### QR Code
-```http
-GET /api/whatsapp/qr
-```
-
-**Response (when QR available):**
-```json
-{
-  "success": true,
-  "data": {
-    "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
-    "connectionStatus": "qr_ready",
-    "timestamp": "2024-01-01T00:00:00.000Z"
-  },
-  "message": "QR code available for scanning"
-}
-```
-
-**Response (when authenticated):**
-```json
-{
-  "success": true,
-  "data": {
-    "qrCode": null,
-    "connectionStatus": "ready",
-    "message": "WhatsApp is already authenticated"
-  },
-  "message": "WhatsApp client is already connected"
-}
-```
-
-### Send Message
-```http
-POST /api/whatsapp/send
-Content-Type: application/json
-
-{
-  "number": "1234567890",
-  "message": "Hello from WhatsApp API!"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "messageId": "3EB0C767D8F4C8E5@c.us",
-    "timestamp": 1704067200,
-    "to": "1234567890@c.us",
-    "message": "Message sent successfully"
-  },
-  "message": "Message sent successfully"
-}
-```
-
-### WhatsApp Health
-```http
-GET /api/whatsapp/health
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "service": "WhatsApp API",
-    "status": "operational",
-    "connectionStatus": "ready",
-    "isReady": true,
-    "timestamp": "2024-01-01T00:00:00.000Z",
-    "uptime": 123.45
-  },
-  "message": "WhatsApp service is operational"
-}
-```
-
-## 🔧 Usage
-
-### 1. Start the Server
-
-```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm start
-```
-
-### 2. Authenticate WhatsApp
-
-1. **Check server status**
-   ```bash
-   curl http://localhost:3001/health
-   ```
-
-2. **Get QR code**
-   ```bash
-   curl http://localhost:3001/api/whatsapp/qr
-   ```
-
-3. **Scan QR code** with your WhatsApp mobile app
-   - Open WhatsApp on your phone
-   - Go to Settings > Linked Devices
-   - Tap "Link a Device"
-   - Scan the QR code from the API response
-
-4. **Verify authentication**
-   ```bash
-   curl http://localhost:3001/api/whatsapp/status
-   ```
-
-### 3. Send Messages
-
+### Send a Message
 ```bash
 curl -X POST http://localhost:3001/api/whatsapp/send \
   -H "Content-Type: application/json" \
@@ -244,112 +122,85 @@ curl -X POST http://localhost:3001/api/whatsapp/send \
   }'
 ```
 
-## 🧪 Testing
-
-### Run API Tests
-
+### Get Session Information
 ```bash
-# Run all tests
-node test-api.js
-
-# Test with custom parameters
-node test-api.js --url http://localhost:3001 --number 1234567890 --message "Test message"
-
-# Show help
-node test-api.js --help
+curl http://localhost:3001/api/whatsapp/session-info
 ```
 
-### Test Endpoints
-
-The test script validates:
-- ✅ Health endpoint
-- ✅ WhatsApp status endpoint
-- ✅ QR code endpoint
-- ✅ Message sending endpoint
-- ✅ WhatsApp health endpoint
-- ✅ Invalid endpoint handling
-- ✅ Input validation
-
-## 📁 Project Structure
-
-```
-whatsapp-backend/
-├── src/
-│   ├── server.js              # Main Express server
-│   ├── whatsapp-client.js     # WhatsApp client manager
-│   └── routes/
-│       └── whatsapp.js        # WhatsApp API routes
-├── .env                       # Environment variables
-├── test-api.js                # API testing script
-├── package.json
-└── README.md
+### Force Reconnection
+```bash
+curl -X POST http://localhost:3001/api/whatsapp/reconnect
 ```
 
-## 🔒 Security Considerations
+### Clean Up Sessions
+```bash
+curl -X POST http://localhost:3001/api/whatsapp/cleanup-sessions
+```
 
-### Production Deployment
+## Error Handling
 
-1. **Environment Variables**
-   - Use strong, unique CLIENT_ID values
-   - Set NODE_ENV=production
-   - Use HTTPS in production
+### Common Error Scenarios
+- **Session Directory Issues**: Automatic creation and validation
+- **Authentication Failures**: Automatic retry with exponential backoff
+- **Network Disconnections**: Intelligent reconnection logic
+- **Corrupted Sessions**: Automatic cleanup and recovery
+- **Memory Issues**: Proper resource cleanup and management
 
-2. **Authentication**
-   - Implement API key authentication
-   - Add rate limiting
-   - Use proper CORS configuration
+### Error Recovery
+- **Automatic**: Built-in recovery mechanisms
+- **Manual**: API endpoints for manual intervention
+- **Monitoring**: Comprehensive logging and status reporting
 
-3. **Session Management**
-   - Secure session storage
-   - Regular session cleanup
-   - Monitor session usage
+## Deployment
 
-## 🐛 Troubleshooting
+### Railway Deployment
+The application is configured for Railway deployment with:
+- Automatic session persistence
+- Environment variable configuration
+- Health check endpoints
+- Graceful shutdown handling
+
+### Environment Considerations
+- **Session Storage**: Persistent session directory
+- **Memory Management**: Proper cleanup of resources
+- **Error Handling**: Comprehensive error recovery
+- **Monitoring**: Health checks and status endpoints
+
+## Troubleshooting
 
 ### Common Issues
+1. **QR Code Not Appearing**: Check session directory permissions
+2. **Authentication Failures**: Clear session directory and restart
+3. **Connection Issues**: Use manual reconnection endpoint
+4. **Memory Issues**: Monitor session cleanup and restart if needed
 
-1. **Port already in use**
-   ```bash
-   # Change port in .env
-   PORT=3002
-   ```
+### Debug Endpoints
+- `/api/whatsapp/session-info` - Detailed diagnostics
+- `/api/whatsapp/health` - Service health status
+- `/api/whatsapp/status` - Connection status
 
-2. **WhatsApp client not ready**
-   - Check if QR code is available
-   - Ensure WhatsApp mobile app is connected
-   - Verify session files are not corrupted
+## Security Considerations
 
-3. **Message sending fails**
-   - Verify phone number format
-   - Check WhatsApp client status
-   - Ensure recipient number is valid
+- **Session Isolation**: Each client ID has separate sessions
+- **Directory Permissions**: Proper file system permissions
+- **Error Logging**: Secure error handling without sensitive data exposure
+- **Input Validation**: Comprehensive input validation and sanitization
 
-### Logs
+## Performance Optimization
 
-Monitor server logs for detailed error information:
-```bash
-npm run dev
-```
+- **Session Caching**: Efficient session storage and retrieval
+- **Connection Pooling**: Optimized connection management
+- **Memory Management**: Proper cleanup and resource management
+- **Health Monitoring**: Proactive health checks prevent issues
 
-## 📝 License
-
-This project is licensed under the ISC License.
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
+4. Add tests if applicable
 5. Submit a pull request
 
-## 📞 Support
+## License
 
-For issues and questions:
-- Check the troubleshooting section
-- Review server logs
-- Open an issue on GitHub
-
----
-
-**Note**: This API uses whatsapp-web.js which is an unofficial WhatsApp Web API. Use responsibly and in compliance with WhatsApp's terms of service.
+ISC License

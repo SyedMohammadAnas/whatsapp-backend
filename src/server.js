@@ -83,7 +83,10 @@ app.get('/', (req, res) => {
                     status: '/api/whatsapp/status',
                     qr: '/api/whatsapp/qr',
                     send: '/api/whatsapp/send',
-                    health: '/api/whatsapp/health'
+                    health: '/api/whatsapp/health',
+                    sessionInfo: '/api/whatsapp/session-info',
+                    reconnect: '/api/whatsapp/reconnect',
+                    cleanupSessions: '/api/whatsapp/cleanup-sessions'
                 }
             }
         },
@@ -166,6 +169,9 @@ const server = app.listen(PORT, async () => {
         console.log('   • GET  /api/whatsapp/qr');
         console.log('   • POST /api/whatsapp/send');
         console.log('   • GET  /api/whatsapp/health');
+        console.log('   • GET  /api/whatsapp/session-info');
+        console.log('   • POST /api/whatsapp/reconnect');
+        console.log('   • POST /api/whatsapp/cleanup-sessions');
 
     } catch (error) {
         console.error('❌ Failed to initialize WhatsApp client:', error.message);
