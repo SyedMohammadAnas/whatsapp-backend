@@ -4,6 +4,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "auto-start": "node auto-restart.js",
     "dev": "nodemon src/server.js",
     "test": "node test-api.js",
     "test-session": "node test-session-management.js"

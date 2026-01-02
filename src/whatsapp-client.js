@@ -14,9 +14,6 @@ let whatsappClient = null;
 let isClientReady = false;
 let connectionStatus = 'disconnected';
 let qrCodeData = null;
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 5;
-let reconnectInterval = null;
 let sessionCheckInterval = null;
 
 /**
@@ -103,49 +100,26 @@ const checkSessionHealth = async () => {
 };
 
 /**
- * Attempt to reconnect WhatsApp client
+ * Handle WhatsApp client failure and restart
  * @returns {Promise<void>}
  */
-const attemptReconnection = async () => {
-    try {
-        if (reconnectAttempts >= maxReconnectAttempts) {
-            console.error(`❌ Max reconnection attempts (${maxReconnectAttempts}) reached`);
-            connectionStatus = 'max_reconnect_exceeded';
-            return;
-        }
+const handleClientFailure = async () => {
+    console.log('🛑 Terminating backend process due to WhatsApp client failure - will auto-restart');
 
-        reconnectAttempts++;
-        console.log(`🔄 Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts}...`);
+    // Stop health checks
+    stopSessionHealthChecks();
 
-        // Disconnect existing client if any
-        if (whatsappClient) {
-            try {
-                await whatsappClient.destroy();
-            } catch (error) {
-                console.log(`⚠️ Error destroying existing client: ${error.message}`);
-            }
-        }
-
-        // Reset state
-        whatsappClient = null;
-        isClientReady = false;
-        connectionStatus = 'reconnecting';
-        qrCodeData = null;
-
-        // Wait before reconnecting
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Reinitialize client
-        await initializeWhatsAppClient();
-
-    } catch (error) {
-        console.error(`❌ Reconnection attempt ${reconnectAttempts} failed: ${error.message}`);
-
-        // Schedule next reconnection attempt
-        if (reconnectAttempts < maxReconnectAttempts) {
-            setTimeout(attemptReconnection, 30000); // Wait 30 seconds before next attempt
+    // Disconnect client if it exists
+    if (whatsappClient) {
+        try {
+            await whatsappClient.destroy();
+        } catch (error) {
+            console.log(`⚠️ Error destroying client during termination: ${error.message}`);
         }
     }
+
+    // Exit the process with error code to trigger auto-restart
+    process.exit(1);
 };
 
 /**
@@ -161,8 +135,8 @@ const startSessionHealthChecks = () => {
             const isHealthy = await checkSessionHealth();
 
             if (!isHealthy && isClientReady) {
-                console.log('⚠️ Session health check failed, attempting reconnection...');
-                await attemptReconnection();
+                console.log('⚠️ Session health check failed, terminating for auto-restart...');
+                await handleClientFailure();
             }
         } catch (error) {
             console.error(`❌ Session health check error: ${error.message}`);
@@ -273,8 +247,8 @@ const initializeWhatsAppClient = async () => {
             // Stop health checks
             stopSessionHealthChecks();
 
-            // Attempt reconnection after auth failure
-            setTimeout(attemptReconnection, 10000);
+            // Immediately terminate and restart
+            setTimeout(handleClientFailure, 1000);
         });
 
         // Event handler: Client disconnected
@@ -287,9 +261,10 @@ const initializeWhatsAppClient = async () => {
             // Stop health checks
             stopSessionHealthChecks();
 
-            // Attempt reconnection unless it was a manual disconnect
+            // Immediately terminate and restart instead of attempting reconnection
             if (reason !== 'MANUAL_DISCONNECT') {
-                setTimeout(attemptReconnection, 5000);
+                console.log('🛑 Terminating backend process due to disconnection - will auto-restart');
+                process.exit(1);
             }
         });
 
@@ -316,9 +291,9 @@ const initializeWhatsAppClient = async () => {
         // Stop health checks
         stopSessionHealthChecks();
 
-        // Attempt reconnection on initialization error
-        setTimeout(attemptReconnection, 10000);
-        throw error;
+        console.log(`🛑 Terminating backend process due to initialization failure`);
+        // Exit the process with error code to trigger auto-restart
+        process.exit(1);
     }
 };
 
@@ -335,8 +310,6 @@ const getWhatsAppState = () => {
         clientId: process.env.CLIENT_ID || 'default-client',
         // Session information
         sessionInfo: {
-            reconnectAttempts: reconnectAttempts,
-            maxReconnectAttempts: maxReconnectAttempts,
             sessionPath: process.env.SESSION_PATH || './whatsapp-session',
             healthChecksActive: sessionCheckInterval !== null
         }
@@ -344,30 +317,27 @@ const getWhatsAppState = () => {
 };
 
 /**
- * Force manual reconnection of WhatsApp client
+ * Force manual restart of WhatsApp client
  * @returns {Promise<Object>} Result object with success status
  */
-const forceReconnection = async () => {
+const forceRestart = async () => {
     try {
-        console.log('🔄 Manual reconnection requested...');
+        console.log('🔄 Manual restart requested...');
 
         // Stop health checks
         stopSessionHealthChecks();
 
-        // Reset reconnection attempts
-        reconnectAttempts = 0;
-
-        // Attempt reconnection
-        await attemptReconnection();
+        // Terminate for auto-restart
+        await handleClientFailure();
 
         return {
             success: true,
-            message: 'Reconnection initiated',
+            message: 'Restart initiated',
             timestamp: new Date().toISOString()
         };
 
     } catch (error) {
-        console.error('❌ Manual reconnection failed:', error.message);
+        console.error('❌ Manual restart failed:', error.message);
         return {
             success: false,
             error: error.message,
@@ -543,7 +513,7 @@ module.exports = {
     isClientReady,
     connectionStatus,
     qrCodeData,
-    forceReconnection,
+    forceRestart,
     getSessionInfo,
     cleanupSessions
 };

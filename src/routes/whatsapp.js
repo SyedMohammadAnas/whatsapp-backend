@@ -11,7 +11,7 @@ const router = express.Router();
 const {
     getWhatsAppState,
     sendWhatsAppMessage,
-    forceReconnection,
+    forceRestart,
     getSessionInfo,
     cleanupSessions
 } = require('../whatsapp-client');
@@ -263,8 +263,8 @@ router.post('/reconnect', async (req, res) => {
     try {
         console.log('🔄 Manual reconnection request received');
 
-        // Force reconnection
-        const result = await forceReconnection();
+        // Force restart
+        const result = await forceRestart();
 
         if (result.success) {
             const response = {

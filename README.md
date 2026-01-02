@@ -57,10 +57,19 @@ LOG_LEVEL=info
 npm run dev
 ```
 
-### Production Mode
+### Production Mode with Auto-Restart
+```bash
+npm run auto-start
+# or
+npm start  # Use start.bat for Windows
+```
+
+### Production Mode (Single Run)
 ```bash
 npm start
 ```
+
+**Note:** For production use, it's recommended to use `npm run auto-start` which will automatically restart the server if it terminates due to connectivity issues.
 
 ### Testing
 ```bash
@@ -126,6 +135,10 @@ src/
 └── routes/
     └── whatsapp.js        # WhatsApp API routes
 ```
+
+## CloudFlare Initiate
+
+cloudflared tunnel --url http://localhost:3001
 
 ### Logging
 
