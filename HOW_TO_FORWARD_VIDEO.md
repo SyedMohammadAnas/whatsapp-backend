@@ -1,29 +1,41 @@
 # How to Forward Video to All Members
 
 ## What This Does
-Forwards the latest video from +91 7396926840 to all 200 members in february_2026 table.
+Gets the latest video from your chat with 7396926840 and forwards it to all 200 members.
+
+## IMPORTANT: Restart Backend First
+The backend MUST be restarted to load the new forwarding functions:
+
+```bash
+# Stop the current backend (Ctrl+C if running)
+# Then start it again:
+cd whatsapp-backend
+npm start
+```
+
+Wait until you see "WhatsApp client ready" before proceeding.
 
 ## Prerequisites
-1. WhatsApp backend must be running: `cd whatsapp-backend && npm start`
-2. WhatsApp must be authenticated (check: http://localhost:3001/api/whatsapp/status)
-3. Source number must have sent a video message
+1. WhatsApp backend restarted (see above)
+2. WhatsApp authenticated on the server
+3. You have the video in your chat with 7396926840
 
-## Step 1: Test Setup (Optional but Recommended)
+## Step 1: Test Setup
 ```bash
+cd whatsapp-backend
 node test-forward-setup.js
 ```
-This checks if everything is ready. All 6 tests should pass.
+All 6 tests MUST pass. If tests 3-4 fail, backend wasn't restarted.
 
 ## Step 2: Run the Forwarding Script
 ```bash
 node forward-video-script.js
 ```
 
-That's it! The script will:
-- Fetch all 200 members from database
-- Get the latest video from +91 7396926840
-- Forward it to all members (takes ~5 minutes)
-- Show progress logs in real-time
+The script will:
+- Get the latest video from your chat with 7396926840
+- Forward it from YOUR WhatsApp number to all 200 members
+- Take ~5 minutes with progress logs
 
 ## What You'll See
 ```
@@ -45,12 +57,13 @@ That's it! The script will:
 ```
 
 ## Troubleshooting
-- **"WhatsApp not ready"** → Restart backend and authenticate
-- **"No video found"** → Check source number sent a video
-- **"Cannot connect"** → Check internet and backend running
+- **Tests 3-4 fail** → Backend not restarted (see above)
+- **"WhatsApp not ready"** → Wait for "WhatsApp client ready" message
+- **"No video found"** → Check you have video in chat with 7396926840
+- **"Cannot connect"** → Verify backend is running on localhost:3001
 
 ## Notes
-- Takes ~5-7 minutes total
+- Backend MUST be restarted first (critical step)
+- Takes ~5-7 minutes total for 200 members
 - 1.5 second delay between each forward
-- Logs show real-time progress
-- Does NOT disrupt backend operations
+- Video forwards from YOUR authenticated WhatsApp session

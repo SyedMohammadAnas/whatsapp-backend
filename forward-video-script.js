@@ -175,7 +175,7 @@ async function getLatestVideoMessage() {
 
         // Find the latest video message
         const videoMessage = messages.find(msg =>
-            msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt')
+            msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'audio')
         );
 
         if (!videoMessage) {

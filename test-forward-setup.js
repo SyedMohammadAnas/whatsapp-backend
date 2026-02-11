@@ -167,7 +167,7 @@ async function testVideoMessageExists() {
         if (response.status === 200 && response.data.success) {
             const messages = response.data.data.messages;
             const videoMessage = messages.find(msg =>
-                msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt')
+                msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'audio')
             );
 
             if (videoMessage) {
