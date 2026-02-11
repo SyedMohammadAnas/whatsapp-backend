@@ -21,7 +21,9 @@ const {
     sendWhatsAppMessage,
     forceRestart,
     getSessionInfo,
-    cleanupSessions
+    cleanupSessions,
+    getMessagesFromChat,
+    forwardMessage
 } = require('../whatsapp-client');
 
 /**
@@ -346,6 +348,133 @@ router.post('/cleanup-sessions', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error during session cleanup:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * GET /api/whatsapp/messages/:number
+ * Get messages from a specific chat
+ * Query params: limit (optional, default 10)
+ */
+router.get('/messages/:number', async (req, res) => {
+    try {
+        logger.info('Get messages request received', '📬');
+
+        const { number } = req.params;
+        const limit = parseInt(req.query.limit) || 10;
+
+        // Validate input
+        if (!number) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Phone number is required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Get messages response sent: Missing fields');
+            return res.status(400).json(errorResponse);
+        }
+
+        // Get messages
+        const result = await getMessagesFromChat(number, limit);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    messages: result.messages,
+                    count: result.count,
+                    chatId: result.chatId
+                },
+                message: 'Messages retrieved successfully'
+            };
+
+            logger.success('Get messages response sent: Messages retrieved');
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: 'Failed to get messages',
+                message: result.error,
+                timestamp: new Date().toISOString()
+            };
+
+            logger.error('Get messages response sent: Failed');
+            res.status(503).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error getting messages:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/forward
+ * Forward a message to specified recipients
+ */
+router.post('/forward', async (req, res) => {
+    try {
+        logger.info('Forward message request received', '📨');
+
+        const { messageId, recipients } = req.body;
+
+        // Validate input
+        if (!messageId || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Message ID and recipients array are required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Forward response sent: Missing fields');
+            return res.status(400).json(errorResponse);
+        }
+
+        // Forward message
+        const result = await forwardMessage(messageId, recipients);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    sent: result.sent,
+                    failed: result.failed,
+                    total: result.total,
+                    errors: result.errors
+                },
+                message: `Message forwarded to ${result.sent}/${result.total} recipients`
+            };
+
+            logger.success(`Forward response sent: ${result.sent}/${result.total} sent`);
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: 'Failed to forward message',
+                message: result.error,
+                timestamp: new Date().toISOString()
+            };
+
+            logger.error('Forward response sent: Forward failed');
+            res.status(503).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error forwarding message:', error.message);
         res.status(500).json({
             success: false,
             error: 'Internal server error',

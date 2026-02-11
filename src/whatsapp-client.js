@@ -237,17 +237,17 @@ const initializeWhatsAppClient = async () => {
             // Aggressive functionality check - test if client can actually work
             const testClientReady = async (attempt = 1) => {
                 if (isClientReady) return; // Already ready from ready event
-                
+
                 try {
                     // Wait a bit before first attempt
                     await new Promise(resolve => setTimeout(resolve, 5000));
-                    
+
                     logger.info(`Testing client (attempt ${attempt}/20)...`, '🔍');
-                    
+
                     // Try to get the client state
                     const state = await whatsappClient.getState();
                     logger.info(`Client state: ${state}`, '📊');
-                    
+
                     if (state === 'CONNECTED') {
                         // Try a simple operation to verify it really works
                         try {
@@ -263,14 +263,14 @@ const initializeWhatsAppClient = async () => {
                             logger.warning(`Client not fully loaded yet: ${testError.message.split('\\n')[0]}`);
                         }
                     }
-                    
+
                     // Retry if not ready and under attempt limit
                     if (attempt < 20) {
                         setTimeout(() => testClientReady(attempt + 1), 3000);
                     } else {
                         logger.error('❌ Client failed to become ready after 20 attempts');
                     }
-                    
+
                 } catch (error) {
                     logger.warning(`Test attempt ${attempt} failed: ${error.message.split('\\n')[0]}`);
                     if (attempt < 20) {
@@ -278,7 +278,7 @@ const initializeWhatsAppClient = async () => {
                     }
                 }
             };
-            
+
             // Start testing
             testClientReady();
         });
@@ -337,7 +337,7 @@ const initializeWhatsAppClient = async () => {
             // When loading reaches 100%, client is fully ready
             if (percent === 100) {
                 logger.success('WhatsApp Web fully loaded (100%)!', '✅');
-                
+
                 // Give it a moment to fully settle
                 setTimeout(() => {
                     if (!isClientReady) {
@@ -530,8 +530,8 @@ const sendWhatsAppMessage = async (number, message) => {
 
         // Get the chat first to ensure it exists
         const chatId = formattedNumber;
-        
-        // Send message using WhatsApp client  
+
+        // Send message using WhatsApp client
         const result = await whatsappClient.sendMessage(chatId, message);
 
         // Show message preview (first 100 chars) for successful sends
@@ -583,6 +583,134 @@ const disconnectWhatsAppClient = async () => {
     }
 };
 
+/**
+ * Get messages from a specific chat
+ * @param {string} number - Phone number to get messages from
+ * @param {number} limit - Maximum number of messages to retrieve
+ * @returns {Promise<Object>} Result object with messages
+ */
+const getMessagesFromChat = async (number, limit = 10) => {
+    try {
+        // Validate client readiness
+        if (!isClientReady || !whatsappClient) {
+            throw new Error('WhatsApp client is not ready');
+        }
+
+        // Format phone number
+        const formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
+
+        logger.info(`Fetching ${limit} messages from ${formattedNumber}`, '📬');
+
+        // Get the chat
+        const chat = await whatsappClient.getChatById(formattedNumber);
+
+        // Fetch messages
+        const messages = await chat.fetchMessages({ limit });
+
+        // Format messages for response
+        const formattedMessages = messages.map(msg => ({
+            id: msg.id._serialized,
+            from: msg.from,
+            to: msg.to,
+            body: msg.body,
+            timestamp: msg.timestamp,
+            hasMedia: msg.hasMedia,
+            type: msg.type,
+            isForwarded: msg.isForwarded,
+            mediaKey: msg.mediaKey
+        }));
+
+        logger.success(`Retrieved ${formattedMessages.length} messages from ${formattedNumber}`);
+
+        return {
+            success: true,
+            messages: formattedMessages,
+            count: formattedMessages.length,
+            chatId: formattedNumber
+        };
+
+    } catch (error) {
+        logger.error(`Error getting messages from chat: ${error.message}`);
+        return {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
+    }
+};
+
+/**
+ * Forward a message to multiple recipients
+ * @param {string} messageId - Serialized message ID to forward
+ * @param {Array<string>} recipients - Array of phone numbers to forward to
+ * @returns {Promise<Object>} Result object with forwarding status
+ */
+const forwardMessage = async (messageId, recipients) => {
+    try {
+        // Validate client readiness
+        if (!isClientReady || !whatsappClient) {
+            throw new Error('WhatsApp client is not ready');
+        }
+
+        logger.info(`Forwarding message ${messageId} to ${recipients.length} recipients`, '📨');
+
+        // Get the message by ID
+        const msg = await whatsappClient.getMessageById(messageId);
+
+        if (!msg) {
+            throw new Error('Message not found');
+        }
+
+        const results = {
+            success: true,
+            sent: 0,
+            failed: 0,
+            total: recipients.length,
+            errors: []
+        };
+
+        // Forward to each recipient
+        for (let i = 0; i < recipients.length; i++) {
+            const recipient = recipients[i];
+            const formattedRecipient = recipient.includes('@c.us') ? recipient : `${recipient}@c.us`;
+
+            try {
+                // Forward the message
+                await msg.forward(formattedRecipient);
+                results.sent++;
+
+                // Log progress every 10 messages
+                if ((i + 1) % 10 === 0 || i === recipients.length - 1) {
+                    logger.info(`Progress: ${i + 1}/${recipients.length} forwarded`, '📊');
+                }
+
+                // Add small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+            } catch (error) {
+                results.failed++;
+                results.errors.push({
+                    recipient: formattedRecipient,
+                    error: error.message
+                });
+                logger.warning(`Failed to forward to ${formattedRecipient}: ${error.message}`);
+            }
+        }
+
+        logger.success(`Forwarding completed: ${results.sent} sent, ${results.failed} failed`);
+
+        return results;
+
+    } catch (error) {
+        logger.error(`Error forwarding message: ${error.message}`);
+        return {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
+    }
+};
+
 // Export functions and state
 module.exports = {
     initializeWhatsAppClient,
@@ -595,5 +723,7 @@ module.exports = {
     qrCodeData,
     forceRestart,
     getSessionInfo,
-    cleanupSessions
+    cleanupSessions,
+    getMessagesFromChat,
+    forwardMessage
 };
