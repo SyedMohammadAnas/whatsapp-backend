@@ -166,21 +166,19 @@ async function testVideoMessageExists() {
 
         if (response.status === 200 && response.data.success) {
             const messages = response.data.data.messages;
-            const videoMessage = messages.find(msg =>
-                msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'audio')
-            );
+            const mediaMessage = messages.find(msg => msg.hasMedia);
 
-            if (videoMessage) {
-                logger.success(`Found video message (ID: ${videoMessage.id.substring(0, 20)}...)`);
-                logger.info(`Video timestamp: ${new Date(videoMessage.timestamp * 1000).toLocaleString()}`);
+            if (mediaMessage) {
+                logger.success(`Found media message (ID: ${mediaMessage.id.substring(0, 20)}...)`);
+                logger.info(`Media timestamp: ${new Date(mediaMessage.timestamp * 1000).toLocaleString()}`);
                 return true;
             } else {
-                logger.error('No video message found in the latest 20 messages');
-                logger.warning('Make sure +91 7396926840 has sent a video message');
+                logger.error('No media message found in the latest 20 messages');
+                logger.warning("Make sure you've sent +91 7396926840 a media message");
                 return false;
             }
         } else {
-            logger.error('Failed to check for video message');
+            logger.error('Failed to check for media message');
             return false;
         }
     } catch (error) {

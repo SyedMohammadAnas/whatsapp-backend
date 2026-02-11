@@ -173,18 +173,16 @@ async function getLatestVideoMessage() {
         const messages = response.data.data.messages;
         logger.info(`Retrieved ${messages.length} messages from source chat`);
 
-        // Find the latest video message
-        const videoMessage = messages.find(msg =>
-            msg.hasMedia && (msg.type === 'video' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'audio')
-        );
+        // Find the latest media message
+        const mediaMessage = messages.find(msg => msg.hasMedia);
 
-        if (!videoMessage) {
-            throw new Error('No video message found in the latest messages');
+        if (!mediaMessage) {
+            throw new Error('No media message found in the latest messages');
         }
 
-        logger.success(`Found video message: ID=${videoMessage.id}, Timestamp=${videoMessage.timestamp}`);
+        logger.success(`Found media message: ID=${mediaMessage.id}, Timestamp=${mediaMessage.timestamp}`);
 
-        return videoMessage;
+        return mediaMessage;
 
     } catch (error) {
         logger.error(`Failed to get video message: ${error.message}`);
