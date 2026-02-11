@@ -11,8 +11,8 @@ const BASE_URL = 'http://localhost:3001';
 const TEST_DELAY = 2000; // Delay between tests in milliseconds
 
 // Test data
-const testNumber = '1234567890'; // Replace with actual test number
-const testMessage = 'Hello from WhatsApp Backend API Test! 🚀';
+const testNumber = '917396926840'; // Test number provided by user (without + prefix)
+const testMessage = 'Hello! WhatsApp Backend is now fully operational! 🎉 Message sent at: ' + new Date().toLocaleString();
 
 // Colors for console output
 const colors = {
@@ -152,8 +152,8 @@ const testWhatsAppSend = async () => {
             return false;
         }
     } catch (error) {
-        if (error.response && error.response.status === 500) {
-            print('yellow', '⚠️  Send failed - WhatsApp client may not be ready');
+        if (error.response && error.response.status === 503) {
+            print('yellow', '⚠️  Send failed - WhatsApp client not ready yet');
             print('blue', `   Error: ${error.response.data.error}`);
             return true; // Not a failure, just client not ready
         }

@@ -7,6 +7,14 @@
 const express = require('express');
 const router = express.Router();
 
+// Enhanced logging functions
+const logger = {
+    info: (message, emoji = 'ℹ️') => console.log(`${emoji} ${message}`),
+    success: (message, emoji = '✅') => console.log(`${emoji} ${message}`),
+    warning: (message, emoji = '⚠️') => console.log(`${emoji} ${message}`),
+    error: (message, emoji = '❌') => console.log(`${emoji} ${message}`)
+};
+
 // Import WhatsApp client functions
 const {
     getWhatsAppState,
@@ -22,7 +30,7 @@ const {
  */
 router.get('/status', async (req, res) => {
     try {
-        console.log('📊 Status request received');
+        logger.info('Status request received', '📊');
 
         // Get current WhatsApp state
         const state = getWhatsAppState();
@@ -127,7 +135,7 @@ router.get('/qr', async (req, res) => {
  */
 router.post('/send', async (req, res) => {
     try {
-        console.log('📤 Send message request received');
+        logger.info('Send message request received', '📤');
 
         const { number, message } = req.body;
 
@@ -140,7 +148,7 @@ router.post('/send', async (req, res) => {
                 timestamp: new Date().toISOString()
             };
 
-            console.log('❌ Send response sent: Missing fields');
+            logger.warning('Send response sent: Missing fields');
             return res.status(400).json(errorResponse);
         }
 
@@ -159,7 +167,7 @@ router.post('/send', async (req, res) => {
                 message: 'Message sent successfully'
             };
 
-            console.log('✅ Send response sent: Message sent');
+            logger.success('Send response sent: Message sent');
             res.status(200).json(response);
         } else {
             const errorResponse = {
@@ -169,7 +177,7 @@ router.post('/send', async (req, res) => {
                 timestamp: result.timestamp
             };
 
-            console.log('❌ Send response sent: Send failed');
+            logger.error('Send response sent: Send failed');
             res.status(503).json(errorResponse);
         }
 

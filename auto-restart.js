@@ -24,6 +24,9 @@ class AutoRestartMonitor {
 
         console.log('🔄 WhatsApp Backend Auto-Restart Monitor started');
         console.log(`📊 Max restarts: ${this.maxRestarts} within ${this.restartWindow / 1000}s window`);
+        console.log('┌─────────────────────────────────────────────────────────┐');
+        console.log('│ Monitor active - will automatically restart on failures │');
+        console.log('└─────────────────────────────────────────────────────────┘');
     }
 
     /**
@@ -47,8 +50,8 @@ class AutoRestartMonitor {
 
         console.log(`\n🚀 Starting WhatsApp backend (attempt ${this.restartCount + 1})`);
 
-        // Use npm start to run the backend
-        this.process = spawn('npm', ['start'], {
+        // Use direct node command to run the backend (avoiding recursive auto-restart)
+        this.process = spawn('node', ['src/server.js'], {
             cwd: path.dirname(__filename),
             stdio: 'inherit',
             shell: true
@@ -64,9 +67,14 @@ class AutoRestartMonitor {
 
             // Only auto-restart if it was an error exit (not manual shutdown)
             if (code !== 0 && code !== null) {
+                console.log(`🔄 Process exited with error code ${code}, initiating auto-restart...`);
                 this.handleProcessExit();
             } else {
-                console.log('✅ Process exited cleanly, not restarting');
+                console.log('✅ Process exited cleanly (code 0), not restarting');
+                // Reset restart counter on successful exit
+                this.restartCount = 0;
+                this.restartTimestamps = [];
+                console.log('🔄 Restart counter reset due to successful exit');
             }
         });
 
@@ -90,13 +98,23 @@ class AutoRestartMonitor {
         if (!this.isWithinRateLimit()) {
             console.error(`❌ Too many restarts (${this.restartCount}) within ${this.restartWindow / 1000}s. Stopping auto-restart.`);
             console.log('🔧 Please check your WhatsApp backend configuration and connectivity.');
+            console.log('💡 Possible causes:');
+            console.log('   • Network connectivity issues');
+            console.log('   • WhatsApp Web API changes');
+            console.log('   • Session corruption');
+            console.log('   • Invalid authentication');
+            console.log('💡 Try: npm run cleanup-sessions and restart');
             return;
         }
 
-        console.log(`⏳ Waiting 10 seconds before restart... (${this.restartCount}/${this.maxRestarts})`);
+        // Progressive backoff delay: 10s, 20s, 30s, then 30s for subsequent restarts
+        const baseDelay = 10000;
+        const progressiveDelay = Math.min(baseDelay * this.restartCount, 30000);
+
+        console.log(`⏳ Waiting ${progressiveDelay/1000} seconds before restart... (${this.restartCount}/${this.maxRestarts})`);
         setTimeout(() => {
             this.startProcess();
-        }, 10000);
+        }, progressiveDelay);
     }
 
     /**
