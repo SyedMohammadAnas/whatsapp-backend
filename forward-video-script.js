@@ -173,8 +173,11 @@ async function getLatestVideoMessage() {
         const messages = response.data.data.messages;
         logger.info(`Retrieved ${messages.length} messages from source chat`);
 
+        // Sort descending by timestamp to ensure latest media is picked
+        const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp);
+
         // Find the latest media message
-        const mediaMessage = messages.find(msg => msg.hasMedia);
+        const mediaMessage = sortedMessages.find(msg => msg.hasMedia);
 
         if (!mediaMessage) {
             throw new Error('No media message found in the latest messages');

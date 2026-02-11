@@ -166,11 +166,12 @@ async function testVideoMessageExists() {
 
         if (response.status === 200 && response.data.success) {
             const messages = response.data.data.messages;
-            const mediaMessage = messages.find(msg => msg.hasMedia);
+            const sortedMessages = [...messages].sort((a, b) => b.timestamp - a.timestamp);
+            const latestMediaMessage = sortedMessages.find(msg => msg.hasMedia);
 
-            if (mediaMessage) {
-                logger.success(`Found media message (ID: ${mediaMessage.id.substring(0, 20)}...)`);
-                logger.info(`Media timestamp: ${new Date(mediaMessage.timestamp * 1000).toLocaleString()}`);
+            if (latestMediaMessage) {
+                logger.success(`Found media message (ID: ${latestMediaMessage.id.substring(0, 20)}...)`);
+                logger.info(`Media timestamp: ${new Date(latestMediaMessage.timestamp * 1000).toLocaleString()}`);
                 return true;
             } else {
                 logger.error('No media message found in the latest 20 messages');
