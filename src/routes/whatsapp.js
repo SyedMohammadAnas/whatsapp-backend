@@ -543,7 +543,7 @@ router.post('/community/message', async (req, res) => {
     try {
         logger.info('Community message request received', '📨');
 
-        const { message, testNumber } = req.body;
+        const { message } = req.body;
 
         // Validate input
         if (!message || !message.trim()) {
@@ -558,19 +558,10 @@ router.post('/community/message', async (req, res) => {
             return res.status(400).json(errorResponse);
         }
 
-        let recipients = [];
-
-        // If test number provided, send only to test number
-        if (testNumber) {
-            logger.info(`Test mode: Sending to ${testNumber}`, '🧪');
-            recipients = [formatPhoneNumber(testNumber)];
-        } else {
-            // Get all members from Supabase
-            const members = await getAllMembers();
-            recipients = members.map(member => formatPhoneNumber(member.mobile_number));
-            logger.info(`Sending to ${recipients.length} members`, '📊');
-        }
-
+        // Get all members from Supabase
+        const members = await getAllMembers();
+        const recipients = members.map(member => formatPhoneNumber(member.mobile_number));
+        logger.info(`Sending to ${recipients.length} members`, '📊');
         // Send bulk message
         const result = await sendBulkMessage(recipients, message);
 
@@ -619,7 +610,7 @@ router.post('/community/media', async (req, res) => {
     try {
         logger.info('Community media forward request received', '📨');
 
-        const { messageId, testNumber } = req.body;
+        const { messageId } = req.body;
 
         // Validate input
         if (!messageId) {
@@ -634,18 +625,9 @@ router.post('/community/media', async (req, res) => {
             return res.status(400).json(errorResponse);
         }
 
-        let recipients = [];
-
-        // If test number provided, forward only to test number
-        if (testNumber) {
-            logger.info(`Test mode: Forwarding to ${testNumber}`, '🧪');
-            recipients = [formatPhoneNumber(testNumber)];
-        } else {
-            // Get all members from Supabase
-            const members = await getAllMembers();
-            recipients = members.map(member => formatPhoneNumber(member.mobile_number));
-            logger.info(`Forwarding to ${recipients.length} members`, '📊');
-        }
+        const members = await getAllMembers();
+        const recipients = members.map(member => formatPhoneNumber(member.mobile_number));
+        logger.info(`Forwarding to ${recipients.length} members`, '📊');
 
         // Forward message
         const result = await forwardMessage(messageId, recipients);
