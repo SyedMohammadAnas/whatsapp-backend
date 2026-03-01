@@ -23,8 +23,13 @@ const {
     getSessionInfo,
     cleanupSessions,
     getMessagesFromChat,
-    forwardMessage
+    forwardMessage,
+    detectLatestMedia,
+    sendBulkMessage
 } = require('../whatsapp-client');
+
+// Import Supabase helper
+const { getAllMembers, formatPhoneNumber } = require('../supabase-helper');
 
 /**
  * GET /api/whatsapp/status
@@ -475,6 +480,204 @@ router.post('/forward', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error forwarding message:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * GET /api/whatsapp/community/detect-media
+ * Detect the latest media message from the assistant number
+ */
+router.get('/community/detect-media', async (req, res) => {
+    try {
+        logger.info('Detect media request received', '🔍');
+
+        // Assistant number
+        const assistantNumber = '917396926840';
+
+        // Detect latest media
+        const result = await detectLatestMedia(assistantNumber);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: result.data,
+                message: 'Media detected successfully'
+            };
+
+            logger.success('Detect media response sent: Media found');
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: 'No media found',
+                message: result.error,
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Detect media response sent: No media');
+            res.status(404).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error detecting media:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/community/message
+ * Send a custom message to all members or test number
+ */
+router.post('/community/message', async (req, res) => {
+    try {
+        logger.info('Community message request received', '📨');
+
+        const { message, testNumber } = req.body;
+
+        // Validate input
+        if (!message || !message.trim()) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Message is required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community message response sent: Missing message');
+            return res.status(400).json(errorResponse);
+        }
+
+        let recipients = [];
+
+        // If test number provided, send only to test number
+        if (testNumber) {
+            logger.info(`Test mode: Sending to ${testNumber}`, '🧪');
+            recipients = [formatPhoneNumber(testNumber)];
+        } else {
+            // Get all members from Supabase
+            const members = await getAllMembers();
+            recipients = members.map(member => formatPhoneNumber(member.mobile_number));
+            logger.info(`Sending to ${recipients.length} members`, '📊');
+        }
+
+        // Send bulk message
+        const result = await sendBulkMessage(recipients, message);
+
+        if (result.success !== false) {
+            const response = {
+                success: true,
+                data: {
+                    sent: result.sent,
+                    failed: result.failed,
+                    total: result.total,
+                    errors: result.errors
+                },
+                message: `Message sent to ${result.sent}/${result.total} recipients`
+            };
+
+            logger.success(`Community message sent: ${result.sent}/${result.total}`);
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: 'Failed to send message',
+                message: result.error,
+                timestamp: new Date().toISOString()
+            };
+
+            logger.error('Community message response sent: Failed');
+            res.status(503).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error sending community message:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/community/media
+ * Forward media to all members or test number
+ */
+router.post('/community/media', async (req, res) => {
+    try {
+        logger.info('Community media forward request received', '📨');
+
+        const { messageId, testNumber } = req.body;
+
+        // Validate input
+        if (!messageId) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Message ID is required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community media response sent: Missing messageId');
+            return res.status(400).json(errorResponse);
+        }
+
+        let recipients = [];
+
+        // If test number provided, forward only to test number
+        if (testNumber) {
+            logger.info(`Test mode: Forwarding to ${testNumber}`, '🧪');
+            recipients = [formatPhoneNumber(testNumber)];
+        } else {
+            // Get all members from Supabase
+            const members = await getAllMembers();
+            recipients = members.map(member => formatPhoneNumber(member.mobile_number));
+            logger.info(`Forwarding to ${recipients.length} members`, '📊');
+        }
+
+        // Forward message
+        const result = await forwardMessage(messageId, recipients);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    sent: result.sent,
+                    failed: result.failed,
+                    total: result.total,
+                    errors: result.errors
+                },
+                message: `Media forwarded to ${result.sent}/${result.total} recipients`
+            };
+
+            logger.success(`Community media forwarded: ${result.sent}/${result.total}`);
+            res.status(200).json(response);
+        } else {
+            const errorResponse = {
+                success: false,
+                error: 'Failed to forward media',
+                message: result.error,
+                timestamp: new Date().toISOString()
+            };
+
+            logger.error('Community media response sent: Failed');
+            res.status(503).json(errorResponse);
+        }
+
+    } catch (error) {
+        console.error('❌ Error forwarding community media:', error.message);
         res.status(500).json({
             success: false,
             error: 'Internal server error',

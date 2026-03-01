@@ -711,6 +711,128 @@ const forwardMessage = async (messageId, recipients) => {
     }
 };
 
+/**
+ * Detect the latest media message from a specific number
+ * @param {string} number - Phone number to check
+ * @returns {Promise<Object>} Result object with media info
+ */
+const detectLatestMedia = async (number) => {
+    try {
+        // Validate client readiness
+        if (!isClientReady || !whatsappClient) {
+            throw new Error('WhatsApp client is not ready');
+        }
+
+        // Format phone number
+        const formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
+
+        logger.info(`Detecting latest media from ${formattedNumber}`, '🔍');
+
+        // Get the chat
+        const chat = await whatsappClient.getChatById(formattedNumber);
+
+        // Fetch recent messages
+        const messages = await chat.fetchMessages({ limit: 20 });
+
+        // Sort by timestamp descending to get latest first
+        const sortedMessages = messages.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Find the latest media message
+        const mediaMessage = sortedMessages.find(msg => msg.hasMedia);
+
+        if (!mediaMessage) {
+            return {
+                success: false,
+                error: 'No media message found in recent messages'
+            };
+        }
+
+        logger.success(`Found media message: ${mediaMessage.type} from ${new Date(mediaMessage.timestamp * 1000).toLocaleString()}`);
+
+        return {
+            success: true,
+            data: {
+                messageId: mediaMessage.id._serialized,
+                type: mediaMessage.type,
+                timestamp: mediaMessage.timestamp,
+                from: mediaMessage.from,
+                hasMedia: mediaMessage.hasMedia
+            }
+        };
+
+    } catch (error) {
+        logger.error(`Error detecting media: ${error.message}`);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+};
+
+/**
+ * Send message to multiple recipients with custom message
+ * @param {Array<string>} recipients - Array of phone numbers
+ * @param {string} message - Message to send
+ * @returns {Promise<Object>} Result object with sending status
+ */
+const sendBulkMessage = async (recipients, message) => {
+    try {
+        // Validate client readiness
+        if (!isClientReady || !whatsappClient) {
+            throw new Error('WhatsApp client is not ready');
+        }
+
+        logger.info(`Sending message to ${recipients.length} recipients`, '📤');
+
+        const results = {
+            success: true,
+            sent: 0,
+            failed: 0,
+            total: recipients.length,
+            errors: []
+        };
+
+        // Send to each recipient
+        for (let i = 0; i < recipients.length; i++) {
+            const recipient = recipients[i];
+            const formattedRecipient = recipient.includes('@c.us') ? recipient : `${recipient}@c.us`;
+
+            try {
+                // Send the message
+                await whatsappClient.sendMessage(formattedRecipient, message);
+                results.sent++;
+
+                // Log progress every 10 messages
+                if ((i + 1) % 10 === 0 || i === recipients.length - 1) {
+                    logger.info(`Progress: ${i + 1}/${recipients.length} sent`, '📊');
+                }
+
+                // Add small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+            } catch (error) {
+                results.failed++;
+                results.errors.push({
+                    recipient: formattedRecipient,
+                    error: error.message
+                });
+                logger.warning(`Failed to send to ${formattedRecipient}: ${error.message}`);
+            }
+        }
+
+        logger.success(`Bulk message completed: ${results.sent} sent, ${results.failed} failed`);
+
+        return results;
+
+    } catch (error) {
+        logger.error(`Error sending bulk message: ${error.message}`);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+};
+
 // Export functions and state
 module.exports = {
     initializeWhatsAppClient,
@@ -725,5 +847,7 @@ module.exports = {
     getSessionInfo,
     cleanupSessions,
     getMessagesFromChat,
-    forwardMessage
+    forwardMessage,
+    detectLatestMedia,
+    sendBulkMessage
 };

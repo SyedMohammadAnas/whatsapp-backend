@@ -1,7 +1,20 @@
-# How to Forward Video to All Members
+# How to Forward Media to All Members
 
-## What This Does
-Gets the latest video from your chat with 7396926840 and forwards it to all 200 members.
+## Two Ways to Forward Media
+
+### Option 1: WhatsApp Community Modal (Recommended)
+The easiest way is through the dashboard UI:
+
+1. Open the dashboard
+2. Click "WhatsApp Community" button (top of page)
+3. Use the "Forward Media" section:
+   - Click "Detect Latest Media from 7396926840"
+   - Review the detected media (type and timestamp)
+   - Click "Test" to send to test number (9849631701)
+   - Click "Forward to All Members" when ready
+
+### Option 2: Command-Line Script
+For automated or scheduled forwarding, use the script:
 
 ## IMPORTANT: Restart Backend First
 The backend MUST be restarted to load the new forwarding functions:
@@ -62,8 +75,29 @@ The script will:
 - **"No video found"** → Check you have video in chat with 7396926840
 - **"Cannot connect"** → Verify backend is running on localhost:3001
 
+## WhatsApp Community Modal Features
+
+The new modal provides a complete community management interface:
+
+### Broadcast Custom Messages
+- Type any message in the text area
+- Test with single recipient (9849631701) before sending to all
+- Send to all 200 members with one click
+
+### Forward Media
+- Automatically detects latest media from your chat with 7396926840
+- Shows media type (video/image/audio) and timestamp
+- Test forwarding before sending to all members
+- Forwards from YOUR authenticated WhatsApp session
+
+### Health Status
+- Green indicator: WhatsApp ready
+- Red indicator: WhatsApp not ready or disconnected
+- Automatically checks on modal open
+
 ## Notes
 - Backend MUST be restarted first (critical step)
 - Takes ~5-7 minutes total for 200 members
 - 1.5 second delay between each forward
-- Video forwards from YOUR authenticated WhatsApp session
+- All messages/media forward from YOUR authenticated WhatsApp session
+- Test buttons only send to 9849631701 for verification
