@@ -91,6 +91,39 @@ async function getAllMembers() {
 }
 
 /**
+ * Get all customers from the total_users table (excludes admins)
+ * @returns {Promise<Array>} Array of total user objects
+ */
+async function getTotalUsers() {
+  try {
+    console.log('📊 Fetching all customers from total_users table...');
+
+    const url = `${SUPABASE_URL}/rest/v1/total_users?select=id,full_name,mobile_number,role&neq(role,admin)`;
+
+    const response = await makeRequest(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch total users: HTTP ${response.status}`);
+    }
+
+    const users = response.data;
+    console.log(`✅ Fetched ${users.length} total users`);
+
+    return users;
+  } catch (error) {
+    console.error(`❌ Failed to get total users: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Format phone number for WhatsApp
  * @param {string} phoneNumber - Raw phone number
  * @returns {string} Formatted phone number
@@ -109,6 +142,7 @@ function formatPhoneNumber(phoneNumber) {
 
 module.exports = {
     getAllMembers,
+  getTotalUsers,
     formatPhoneNumber,
     CURRENT_MONTH_TABLE
 };

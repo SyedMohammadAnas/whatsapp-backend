@@ -29,7 +29,14 @@ const {
 } = require('../whatsapp-client');
 
 // Import Supabase helper
-const { getAllMembers, formatPhoneNumber } = require('../supabase-helper');
+const { getAllMembers, getTotalUsers, formatPhoneNumber } = require('../supabase-helper');
+
+const buildRecipientList = (users = []) => {
+    return users
+        .map(user => user.mobile_number)
+        .filter(Boolean)
+        .map(number => formatPhoneNumber(number));
+};
 
 /**
  * GET /api/whatsapp/status
@@ -603,6 +610,84 @@ router.post('/community/message', async (req, res) => {
 });
 
 /**
+ * POST /api/whatsapp/community/message/total-users
+ * Send a custom message to all customers listed in total_users
+ */
+router.post('/community/message/total-users', async (req, res) => {
+    try {
+        logger.info('Community total-users message request received', '📨');
+
+        const { message } = req.body;
+
+        if (!message || !message.trim()) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Message is required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community total-users message response sent: Missing message');
+            return res.status(400).json(errorResponse);
+        }
+
+        const users = await getTotalUsers();
+        const recipients = buildRecipientList(users);
+
+        if (!recipients.length) {
+            const errorResponse = {
+                success: false,
+                error: 'No recipients',
+                message: 'No customers available to message',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community total-users message response sent: No recipients');
+            return res.status(404).json(errorResponse);
+        }
+
+        logger.info(`Sending to ${recipients.length} customers`, '📊');
+
+        const result = await sendBulkMessage(recipients, message);
+
+        if (result.success !== false) {
+            const response = {
+                success: true,
+                data: {
+                    sent: result.sent,
+                    failed: result.failed,
+                    total: result.total,
+                    errors: result.errors
+                },
+                message: `Message sent to ${result.sent}/${result.total} customers`
+            };
+
+            logger.success(`Community total-users message sent: ${result.sent}/${result.total}`);
+            return res.status(200).json(response);
+        }
+
+        const errorResponse = {
+            success: false,
+            error: 'Failed to send message',
+            message: result.error,
+            timestamp: new Date().toISOString()
+        };
+
+        logger.error('Community total-users message response sent: Failed');
+        res.status(503).json(errorResponse);
+
+    } catch (error) {
+        console.error('❌ Error sending community total-users message:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
  * POST /api/whatsapp/community/media
  * Forward media to all members or test number
  */
@@ -660,6 +745,84 @@ router.post('/community/media', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error forwarding community media:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * POST /api/whatsapp/community/media/total-users
+ * Forward media to all customers listed in total_users
+ */
+router.post('/community/media/total-users', async (req, res) => {
+    try {
+        logger.info('Community total-users media request received', '📨');
+
+        const { messageId } = req.body;
+
+        if (!messageId) {
+            const errorResponse = {
+                success: false,
+                error: 'Missing required fields',
+                message: 'Message ID is required',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community total-users media response sent: Missing messageId');
+            return res.status(400).json(errorResponse);
+        }
+
+        const users = await getTotalUsers();
+        const recipients = buildRecipientList(users);
+
+        if (!recipients.length) {
+            const errorResponse = {
+                success: false,
+                error: 'No recipients',
+                message: 'No customers available to forward media',
+                timestamp: new Date().toISOString()
+            };
+
+            logger.warning('Community total-users media response sent: No recipients');
+            return res.status(404).json(errorResponse);
+        }
+
+        logger.info(`Forwarding to ${recipients.length} customers`, '📊');
+
+        const result = await forwardMessage(messageId, recipients);
+
+        if (result.success) {
+            const response = {
+                success: true,
+                data: {
+                    sent: result.sent,
+                    failed: result.failed,
+                    total: result.total,
+                    errors: result.errors
+                },
+                message: `Media forwarded to ${result.sent}/${result.total} customers`
+            };
+
+            logger.success(`Community total-users media forwarded: ${result.sent}/${result.total}`);
+            return res.status(200).json(response);
+        }
+
+        const errorResponse = {
+            success: false,
+            error: 'Failed to forward media',
+            message: result.error,
+            timestamp: new Date().toISOString()
+        };
+
+        logger.error('Community total-users media response sent: Failed');
+        res.status(503).json(errorResponse);
+
+    } catch (error) {
+        console.error('❌ Error forwarding community total-users media:', error.message);
         res.status(500).json({
             success: false,
             error: 'Internal server error',
